@@ -1,73 +1,60 @@
-"""
-from environment import Environment
-
-env = Environment(20)
-
-env.generate_obstacles(40)
-env.generate_danger(15)
-
-env.print_map()
-"""
-"""
-version 2
-from environment import Environment
-from planner import AStarPlanner
-
-env = Environment(20)
-
-env.generate_obstacles(40)
-env.generate_danger(15)
-
-planner = AStarPlanner(env.grid)
-
-path = planner.find_path(env.start, env.target)
-
-env.print_map()
-
-print("\nPath:", path)
-if path:
-    for x, y in path:
-        if (x, y) != env.start and (x, y) != env.target:
-            env.grid[x][y] = "*"
-
-env.print_map()
-print("Path:", path)
-"""
 from environment import Environment
 from planner import AStarPlanner
 from agent import NavigationAgent
 
 
 def main():
-
     env = Environment(20)
 
     env.generate_obstacles(40)
-    env.generate_danger(150)
+    env.generate_danger(120)
 
-    print("Original Map:")
-    env.print_map()
+    current_pos = env.start
+    trail = {current_pos}
+    current_path = None
 
-    planner = AStarPlanner(env.grid)
+    max_ticks = 120
 
-    agent = NavigationAgent(env, planner)
+    print("Initial Map:")
+    env.print_map(path_marks=trail, agent_pos=current_pos)
 
-    path = agent.plan_safe_path()
+    for tick in range(1, max_ticks + 1):
+        if current_pos == env.target:
+            print(f"\n[Tick {tick}] 到达目标点: {env.target}")
+            break
 
-    if path:
-        for x, y in path:
-            if (x, y) != env.start and (x, y) != env.target:
-                env.grid[x][y] = 3
+        env.step_dynamic_danger(danger_add_prob=0.03, danger_remove_prob=0.015)
 
-        print("\nPath Found!")
+        planner = AStarPlanner(env.grid)
+        agent = NavigationAgent(env, planner)
+
+        need_replan = agent.should_replan(current_path)
+
+        if need_replan:
+            current_path, path_risk = agent.plan_safe_path(current_pos, env.target)
+            print(f"[Tick {tick}] 重规划 -> path_risk={path_risk}")
+
+        if current_path is None or len(current_path) < 2:
+            print(f"\n[Tick {tick}] 无可行路径，任务失败。")
+            break
+
+        next_pos = current_path[1]
+        current_pos = next_pos
+        trail.add(current_pos)
+
+        current_path = current_path[1:]
+
+        if tick % 10 == 0 or current_pos == env.target:
+            print(f"\nMap Snapshot @ Tick {tick}")
+            env.print_map(path_marks=trail, agent_pos=current_pos)
 
     else:
-        print("\nNo Path Found!")
+        print("\n超过最大步数，任务结束。")
 
-    print("\nPath Map:")
-    env.print_map()
-
-    print("\nPath:", path)
+    if current_pos == env.target:
+        print("\n任务结果：成功到达目标。")
+    else:
+        print("\n任务结果：未到达目标。")
 
 
 if __name__ == "__main__":
