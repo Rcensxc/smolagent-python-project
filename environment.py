@@ -31,7 +31,8 @@ class Environment:
         symbols = {
             0: ".",
             1: "X",
-            2: "D"
+            2: "D",
+            3: "*"
         }
 
         for i in range(self.size):

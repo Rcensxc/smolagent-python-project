@@ -6,6 +6,16 @@ class AStarPlanner:
         self.grid = grid
         self.size = len(grid)
 
+    def get_cost(self, x, y):
+
+        if self.grid[x][y] == 0:  # 空地
+            return 1
+
+        if self.grid[x][y] == 2:  # 危险区域
+            return 6
+
+        return 1
+
     def heuristic(self, a, b):
         return abs(a[0] - b[0]) + abs(a[1] - b[1])
 
@@ -44,7 +54,9 @@ class AStarPlanner:
                 if self.grid[x][y] == 1:
                     continue
 
-                tentative_g = g_score[current] + 1
+                cost = self.get_cost(x, y)
+
+                tentative_g = g_score[current] + cost
 
                 if neighbor not in g_score or tentative_g < g_score[neighbor]:
                     came_from[neighbor] = current
