@@ -4,17 +4,44 @@ from llm_policy import SmolAgentPolicy
 from planner import AStarPlanner
 
 
-def summarize_state(env, current_pos, goal_path, frontier_path, tick):
+def summarize_state(env, current_pos, goal_path, goal_risk, frontier_path, frontier_goal, tick):
+    goal_exists = goal_path is not None
+    frontier_exists = frontier_path is not None
+
+    default_action = "goal"
+    if not goal_exists and frontier_exists:
+        default_action = "frontier"
+
     return {
         "tick": tick,
-        "current_pos": current_pos,
+        "position": current_pos,
         "target": env.target,
         "explored_ratio": round(env.explored_ratio(), 3),
-        "goal_path_exists": goal_path is not None,
-        "goal_path_len": len(goal_path) if goal_path else None,
-        "frontier_path_exists": frontier_path is not None,
-        "frontier_path_len": len(frontier_path) if frontier_path else None,
+        "default_action": default_action,
+        "goal": {
+            "path_exists": goal_exists,
+            "path_len": len(goal_path) if goal_exists else None,
+            "risk": goal_risk,
+        },
+        "frontier": {
+            "path_exists": frontier_exists,
+            "path_len": len(frontier_path) if frontier_exists else None,
+            "goal": frontier_goal,
+        },
     }
+
+
+def pick_path_by_action(decision_action, summary, goal_path, frontier_path):
+    if decision_action == "frontier" and summary["frontier"]["path_exists"]:
+        return frontier_path, "frontier"
+
+    if summary["goal"]["path_exists"]:
+        return goal_path, "goal"
+
+    if summary["frontier"]["path_exists"]:
+        return frontier_path, "frontier"
+
+    return None, "none"
 
 
 def main():
@@ -53,21 +80,26 @@ def main():
         frontier_goal = agent.choose_frontier_goal(current_pos)
         frontier_path = planner.find_path(current_pos, frontier_goal) if frontier_goal else None
 
-        summary = summarize_state(env, current_pos, goal_path, frontier_path, tick)
-        decision = policy.decide(summary, rule_need_replan)
+        summary = summarize_state(
+            env,
+            current_pos,
+            goal_path,
+            goal_risk,
+            frontier_path,
+            frontier_goal,
+            tick,
+        )
 
-        if decision["action"] == "frontier" and goal_path is None:
-            selected_path = frontier_path
-            path_name = "frontier"
-        else:
-            selected_path = goal_path
-            path_name = "goal"
+        decision = policy.decide(summary, rule_need_replan)
+        selected_path, path_name = pick_path_by_action(
+            decision["action"], summary, goal_path, frontier_path
+        )
 
         if decision["replan"] or current_path is None:
             current_path = selected_path
             print(
                 f"[Tick {tick}] 决策={path_name} replan={decision['replan']} "
-                f"reason={decision['reason']} explored={summary['explored_ratio']} risk={goal_risk}"
+                f"reason={decision['reason']} explored={summary['explored_ratio']} goal_risk={goal_risk}"
             )
 
         if current_path is None or len(current_path) < 2:
