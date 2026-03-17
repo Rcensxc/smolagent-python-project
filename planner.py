@@ -1,10 +1,12 @@
 import heapq
 
+
 class AStarPlanner:
 
-    def __init__(self, grid):
+    def __init__(self, grid, danger_cost=6):
         self.grid = grid
         self.size = len(grid)
+        self.danger_cost = danger_cost
 
     def get_cost(self, x, y):
 
@@ -12,7 +14,7 @@ class AStarPlanner:
             return 1
 
         if self.grid[x][y] == 2:  # 危险区域
-            return 6
+            return self.danger_cost
 
         return 1
 
