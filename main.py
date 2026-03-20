@@ -1,3 +1,6 @@
+import os
+import random
+
 from agent import NavigationAgent
 from environment import Environment
 from llm_policy import SmolAgentPolicy
@@ -44,11 +47,38 @@ def pick_path_by_action(decision_action, summary, goal_path, frontier_path):
     return None, "none"
 
 
+def build_demo_aerial_capture(size):
+    """构造一个可复现实验用的“俯拍三维数据”样例。"""
+    random.seed(7)
+    height_grid = [[0.15 for _ in range(size)] for _ in range(size)]
+    risk_grid = [[0.05 for _ in range(size)] for _ in range(size)]
+
+    for x in range(3, min(8, size)):
+        for y in range(4, min(12, size)):
+            height_grid[x][y] = 3.4  # 高障碍群
+
+    for y in range(1, size - 1):
+        height_grid[size // 2][y] = 1.7  # 坡坎/泥泞带
+        risk_grid[size // 2][y] = 0.72
+
+    for x in range(max(0, size - 6), size - 1):
+        for y in range(max(0, size - 6), size - 1):
+            risk_grid[x][y] = max(risk_grid[x][y], 0.8)
+
+    return height_grid, risk_grid
+
+
 def main():
     env = Environment(size=20, vision_radius=2)
 
-    env.generate_obstacles(40)
-    env.generate_danger(120)
+    use_aerial_3d = os.getenv("USE_AERIAL_3D", "0") == "1"
+    if use_aerial_3d:
+        h, r = build_demo_aerial_capture(env.size)
+        env.load_from_aerial_3d(height_grid=h, risk_grid=r)
+        print("已载入三维俯拍数据并完成障碍/危险识别。")
+    else:
+        env.generate_obstacles(40)
+        env.generate_danger(120)
 
     current_pos = env.start
     trail = {current_pos}

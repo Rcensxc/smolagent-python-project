@@ -1,4 +1,7 @@
 import random
+from typing import List, Optional, Sequence, Tuple
+
+from photo_mapper import Aerial3DMapConverter
 
 
 UNKNOWN = -1
@@ -23,6 +26,48 @@ class Environment:
 
     def _is_protected_cell(self, x, y):
         return (x, y) == self.start or (x, y) == self.target
+
+    def load_map(
+        self,
+        grid: Sequence[Sequence[int]],
+        start: Optional[Tuple[int, int]] = None,
+        target: Optional[Tuple[int, int]] = None,
+    ):
+        """直接加载外部地图网格（0 可通行 / 1 障碍 / 2 危险）。"""
+        if not grid or not grid[0]:
+            raise ValueError("grid 不能为空")
+
+        size = len(grid)
+        if any(len(row) != size for row in grid):
+            raise ValueError("当前实现要求 grid 为 N x N 方阵")
+
+        if start is not None:
+            self.start = start
+        if target is not None:
+            self.target = target
+
+        self.size = size
+        self.true_grid = [list(row) for row in grid]
+        self.known_grid = [[UNKNOWN for _ in range(size)] for _ in range(size)]
+
+        # 保证起终点可通行，避免导入数据直接锁死任务
+        sx, sy = self.start
+        tx, ty = self.target
+        self.true_grid[sx][sy] = 0
+        self.true_grid[tx][ty] = 0
+
+    def load_from_aerial_3d(
+        self,
+        height_grid: List[List[float]],
+        risk_grid: Optional[List[List[float]]] = None,
+        start: Optional[Tuple[int, int]] = None,
+        target: Optional[Tuple[int, int]] = None,
+        converter: Optional[Aerial3DMapConverter] = None,
+    ):
+        """将三维俯拍数据转换成地图并写入环境。"""
+        mapper = converter or Aerial3DMapConverter()
+        mapped_grid = mapper.convert(height_grid=height_grid, risk_grid=risk_grid)
+        self.load_map(mapped_grid, start=start, target=target)
 
     def generate_obstacles(self, num=30):
         """随机生成障碍物（写入真实地图）"""
